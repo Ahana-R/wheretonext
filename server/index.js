@@ -43,6 +43,41 @@ app.get("/api/plan", async (req, res) => {
   }
 });
 
+
+app.get("/api/plan-stream", async (req, res) => {
+  const { destination, days, budget } = req.query;
+
+  if (!destination || !days) {
+    return res.status(400).json({ error: "Please tell me a destination and number of days." });
+  }
+
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+
+  try {
+    const stream = client.beta.messages.stream({
+      model: "claude-opus-5-5",
+      max_tokens: 16000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      system: "You are travel planner, a friendly travel planner for everyone. Keep answers short. For every place, mention one local food to try and a rough cost in rupees.",
+      messages: [
+        { role: "user", content: `Plan a ${days}-day trip to ${destination} with a budget of ₹${budget}.` }
+      ],
+    });
+
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        res.write(event.delta.text);
+      }
+    }
+  } catch (error) {
+    console.error("AI error:", error.message);
+    res.write("\n\nSorry, the trip planner is having trouble. Please try again.");
+  }
+
+  res.end();
+});
+
 app.listen(3001, () => {
   console.log("Server running on http://localhost:3001");
 });

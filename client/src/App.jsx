@@ -8,13 +8,30 @@ export default function App() {
   const [plan, setPlan] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function planTrip() {
+    async function planTrip() {
     setLoading(true)
     setPlan('')
     const params = new URLSearchParams({ destination, days, budget })
-    const res = await fetch(`/api/plan?${params}`)
-    const data = await res.json()
-    setPlan(data.plan || data.error)
+    const res = await fetch(`/api/plan-stream?${params}`)
+
+    // If the server said "bad request" (e.g. missing destination), show its message
+    if (!res.ok) {
+      const data = await res.json()
+      setPlan(data.error)
+      setLoading(false)
+      return
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const piece = decoder.decode(value, { stream: true })
+      setPlan((oldPlan) => oldPlan + piece)
+    }
+
     setLoading(false)
   }
 
